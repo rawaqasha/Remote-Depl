@@ -1,0 +1,117 @@
+tosca_definitions_version: cloudify_dsl_1_0
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/3.1/types.yaml
+  - https://raw.githubusercontent.com/cloudify-cosmo/cloudify-docker-plugin/1.1/plugin.yaml
+  - http://www.getcloudify.org/spec/fabric-plugin/1.1/plugin.yaml
+  - https://raw.githubusercontent.com/rawaqasha/e-sc-cloudify/master/esc_nodetypes.yaml
+
+inputs:
+
+  input-dir:
+      description: >
+        The dir path of the input files  
+      default: '~/myDir/Data'
+
+  docker-image: 
+      description: > 
+        Docker image to be used for container building
+      default: 'ubuntu:14.04'
+
+  create_image:
+      description: > 
+        an option to create Docker images
+      default: 'True'
+
+node_types:
+
+  docker_container:
+    derived_from: cloudify.nodes.Root
+    properties:
+      image_name:
+        type: string
+        default: { get_input: docker-image }
+      container_ID:
+        type: string
+        default: container1
+
+  workflow:
+    derived_from: cloudify.nodes.ApplicationModule
+    properties:
+      description:
+        type: string
+        default: 'this a nested WF'
+      name: 
+        type: string
+      url:
+        type: string
+      ssh-key:
+        type: string
+        default: ''
+
+node_templates:
+
+  host:
+    type: cloudify.nodes.Compute
+    properties:
+      ip: localhost
+      install_agent: false
+
+  starterBlock:
+    type: cloudify.nodes.ApplicationModule
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: Core-LifecycleScripts/start-inhost.sh
+          inputs:
+            process:
+              args: [nested-WFs]
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: host
+
+  #wf1:
+  #  type: workflow
+  #  properties:
+  #    url: 'https://github.com/WorkflowCenter-Repositories/Picard.git'
+   #   name: Picard
+   #   description: 'running picard description'
+   # interfaces:
+    #  cloudify.interfaces.lifecycle:
+     #   start:
+      #    implementation: fabric.fabric_plugin.tasks.run_task
+       #   inputs:
+        #    tasks_file: tasks/task.py
+         #   task_name: wf_deploy
+          #  task_properties:
+           #   wf_url: { get_property: [SELF, url]}
+            #  wf_name: { get_property: [SELF, name]}
+          #  fabric_env:
+           #   host_string: 192.168.56.102
+            #  user: multi-exp
+          #    key_filename: ~/.ssh/id_rsa
+   # relationships:
+    #  - type: cloudify.relationships.contained_in
+     #   target: host
+      #- type: cloudify.relationships.depends_on
+    #    target: starterBlock
+
+  wf2:
+    type: workflow
+    properties:
+      url: 'https://github.com/WorkflowCenter-Repositories/Picard.git'
+      name: Picard
+      description: 'running picard description'
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          implementation: scripts/remote-deploy.sh
+          inputs:
+            process:
+             args: [ec2-35-161-60-98.us-west-2.compute.amazonaws.com, ubuntu]
+    relationships:
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: host
+      - type: cloudify.relationships.depends_on
+        target: starterBlock
